@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: privacy_messenger
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: localdev123
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  # Backend API + WebSocket
+  backend:
+    build: ./privacy-messenger
+    ports:
+      - "8082:8082"
+    environment:
+      PORT: 8082
+      NODE_ENV: development
+      DATABASE_URL: postgresql://postgres:localdev123@postgres:5432/privacy_messenger
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev-jwt-secret-change-in-production
+      JWT_REFRESH_SECRET: dev-refresh-secret-change-in-production
+      ENCRYPTION_SALT_ROUNDS: 12
+    depends_on:
+      - postgres
+      - redis
+
+  # Frontend (dev mode)
+  frontend:
+    build:
+      context: ./privacy-messenger-app
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
