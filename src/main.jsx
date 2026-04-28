@@ -1,6 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
+import Privacy from './pages/Privacy.jsx';
+
+const Root = window.location.pathname === '/privacy' ? Privacy : App;
 
 // Register service worker for push notifications
 if ('serviceWorker' in navigator) {
@@ -19,6 +22,6 @@ navigator.serviceWorker?.addEventListener('message', (event) => {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <App />
+    <Root />
   </React.StrictMode>
 );
