@@ -1,5 +1,5 @@
 {
-  "appId": "com.privacymessenger.app",
+  "appId": "com.morven.privacymessenger",
   "appName": "Privacy Messenger",
   "webDir": "dist",
   "server": {
