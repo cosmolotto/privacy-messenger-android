@@ -764,11 +764,63 @@ function NewChatScreen({ onBack, onStartChat }) {
 // ─── SETTINGS SCREEN ─────────────────────────────
 function SettingsScreen({ user, onBack, onLogout }) {
   const [copied, setCopied] = useState(false);
+  const [mrvBalance, setMrvBalance] = useState(null);
+  const [proStatus, setProStatus] = useState(localStorage.getItem("pm_pro_tx") ? "active" : "free");
+  const [busy, setBusy] = useState(false);
 
   const handleCopy = () => {
     navigator.clipboard?.writeText(user.uniqueId);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  useEffect(() => {
+    const w = window.morvenWallet;
+    if (!w) return;
+    w.getBalance().then(b => setMrvBalance(b.mrv)).catch(() => {});
+  }, []);
+
+  const upgradeWithMrv = async () => {
+    const w = window.morvenWallet;
+    if (!w) { alert("MorvenWallet SDK not loaded"); return; }
+    setBusy(true);
+    try {
+      const auth = await w.login();
+      const bal = await w.getBalance(auth.jwt);
+      if (bal.mrv < 50) {
+        alert(`Need 50 MRV — you have ${bal.mrv.toFixed(1)}.`);
+        setBusy(false); return;
+      }
+      if (!confirm(`Upgrade to Privacy Messenger Pro for 50 MRV?\nBalance after: ${(bal.mrv - 50).toFixed(1)} MRV`)) {
+        setBusy(false); return;
+      }
+      const tx = await w.pay(auth.jwt, 50, "privacy-messenger-pro");
+      if (tx.success) {
+        localStorage.setItem("pm_pro_tx", tx.tx_id);
+        setProStatus("active");
+        setMrvBalance(tx.new_balance);
+        alert(`✓ Pro unlocked! TX: ${tx.tx_id}`);
+      }
+    } catch (e) {
+      alert("MRV payment failed: " + e.message);
+    }
+    setBusy(false);
+  };
+
+  const inviteFriend = async () => {
+    const w = window.morvenWallet;
+    if (!w) { alert("MorvenWallet SDK not loaded"); return; }
+    try {
+      const auth = await w.login();
+      const wallet = (auth.user && (auth.user.wallet_id || auth.user.email)) || user.uniqueId;
+      const link = `https://privacy-messenger.vercel.app/?ref=${encodeURIComponent(wallet)}`;
+      if (navigator.share) {
+        await navigator.share({ title: "Privacy Messenger", text: "Try truly private messaging — earn 3 MRV when you sign up.", url: link });
+      } else {
+        await navigator.clipboard.writeText(link);
+        alert("Invite link copied. You earn 3 MRV per friend who signs up.");
+      }
+    } catch (e) { /* user cancelled */ }
   };
 
   const SettingRow = ({ icon, label, sub, onClick, danger }) => (
@@ -810,6 +862,24 @@ function SettingsScreen({ user, onBack, onLogout }) {
             <Icon name={copied ? "check" : "copy"} size={14} color={copied ? ACCENT : TEXT3} />
           </div>
           {copied && <p style={{ fontSize: 11, color: ACCENT, marginTop: 6 }}>Copied!</p>}
+        </div>
+
+        {/* MRV / Pro upgrade panel */}
+        <div style={{ margin: "16px 16px 8px", padding: "16px 18px", background: "linear-gradient(135deg, rgba(124,58,237,0.10), rgba(168,85,247,0.04))", border: "1px solid rgba(168,85,247,0.25)", borderRadius: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#a855f7" }}>◈ MorvenWallet</span>
+            <span style={{ fontSize: 12, color: TEXT3 }}>{mrvBalance == null ? "Not connected" : `${mrvBalance.toFixed(1)} MRV`}</span>
+          </div>
+          {proStatus === "active" ? (
+            <p style={{ fontSize: 13, color: TEXT2 }}>✓ Privacy Messenger Pro active</p>
+          ) : (
+            <button onClick={upgradeWithMrv} disabled={busy} style={{ width: "100%", background: "#7c3aed", color: "#fff", border: "none", padding: "10px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.6 : 1 }}>
+              {busy ? "Processing…" : "Upgrade to Pro · 50 MRV"}
+            </button>
+          )}
+          <button onClick={inviteFriend} style={{ width: "100%", marginTop: 8, background: "transparent", color: "#a855f7", border: "1px solid rgba(168,85,247,0.4)", padding: "9px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+            Invite Friend · Earn 3 MRV
+          </button>
         </div>
 
         {/* Settings List */}
